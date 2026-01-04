@@ -2,7 +2,7 @@ import pybaseball
 from pybaseball import statcast
 import pandas as pd
 import numpy as np
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 
 def calculate_vaa_haa(df):
@@ -18,8 +18,15 @@ def calculate_vaa_haa(df):
 
 
 def fetch_statcast_chunked(start_date, end_date, chunk_days=7):
+
+    # Convert strings → datetime.date if needed
+    if isinstance(start_date, str):
+        start_date = datetime.strptime(start_date, "%Y-%m-%d").date()
+    if isinstance(end_date, str):
+        end_date = datetime.strptime(end_date, "%Y-%m-%d").date()
+
     print(f"Fetching StatCast data from {start_date} to {end_date} in {chunk_days}-day chunks...")
-    
+
     all_chunks = []
     cur = start_date
 
@@ -28,7 +35,10 @@ def fetch_statcast_chunked(start_date, end_date, chunk_days=7):
         print(f"  → {cur} to {chunk_end}")
 
         try:
-            df = statcast(cur.strftime("%Y-%m-%d"), chunk_end.strftime("%Y-%m-%d"))
+            df = statcast(
+                cur.strftime("%Y-%m-%d"),
+                chunk_end.strftime("%Y-%m-%d")
+            )
             if not df.empty:
                 all_chunks.append(df)
         except Exception as e:
@@ -36,10 +46,8 @@ def fetch_statcast_chunked(start_date, end_date, chunk_days=7):
 
         cur = chunk_end + timedelta(days=1)
 
-    if all_chunks:
-        return pd.concat(all_chunks, ignore_index=True)
-    else:
-        return pd.DataFrame()
+    return pd.concat(all_chunks, ignore_index=True) if all_chunks else pd.DataFrame()
+
 
 
 
