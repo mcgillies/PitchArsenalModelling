@@ -2,6 +2,7 @@ import pybaseball
 from pybaseball import statcast
 import pandas as pd
 import numpy as np
+from datetime import timedelta
 
 
 def calculate_vaa_haa(df):
@@ -14,6 +15,32 @@ def calculate_vaa_haa(df):
     df['HAA'] = np.degrees(np.arctan2(dx, np.abs(dy)))
 
     return df
+
+
+def fetch_statcast_chunked(start_date, end_date, chunk_days=7):
+    print(f"Fetching StatCast data from {start_date} to {end_date} in {chunk_days}-day chunks...")
+    
+    all_chunks = []
+    cur = start_date
+
+    while cur <= end_date:
+        chunk_end = min(cur + timedelta(days=chunk_days - 1), end_date)
+        print(f"  → {cur} to {chunk_end}")
+
+        try:
+            df = statcast(cur.strftime("%Y-%m-%d"), chunk_end.strftime("%Y-%m-%d"))
+            if not df.empty:
+                all_chunks.append(df)
+        except Exception as e:
+            print(f"    ⚠️ Failed for {cur}–{chunk_end}: {e}")
+
+        cur = chunk_end + timedelta(days=1)
+
+    if all_chunks:
+        return pd.concat(all_chunks, ignore_index=True)
+    else:
+        return pd.DataFrame()
+
 
 
 def aggregate_pitch_data(start_date, end_date, save=False, output_path=None):
@@ -37,9 +64,9 @@ def aggregate_pitch_data(start_date, end_date, save=False, output_path=None):
         Aggregated pitch data with statistics and descriptors
     """
     
-    # Fetch StatCast data
-    print(f"Fetching StatCast data from {start_date} to {end_date}...")
-    statcast_data = statcast(start_date, end_date)
+    # Fetch StatCast data chunked. 
+    statcast_data = fetch_statcast_chunked(start_date, end_date, chunk_days=7)
+
     
     # Select columns of interest
     cols = [
@@ -129,10 +156,12 @@ def aggregate_pitch_data(start_date, end_date, save=False, output_path=None):
 
 if __name__ == "__main__":
     # Example usage
+    start_date = '2024-03-28'
+    end_date = '2025-06-27'
     result = aggregate_pitch_data(
-        start_date='2025-03-28',
-        end_date='2025-03-29',
+        start_date=start_date,
+        end_date=end_date,
         save=True,
-        output_path='initial_short_pitches_description_whiff_csw_stats.parquet'
+        output_path=f'{start_date}_{end_date}_pitches_description_whiff_csw_stats.parquet'
     )
     print(result.head())
