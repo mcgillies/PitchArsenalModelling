@@ -170,6 +170,6 @@ if __name__ == "__main__":
         start_date=start_date,
         end_date=end_date,
         save=True,
-        output_path=f'{start_date}_{end_date}_pitches_description_whiff_csw_stats.parquet'
+        output_path=f'data/{start_date}_{end_date}_pitches_description_whiff_csw_stats.parquet'
     )
     print(result.head())
