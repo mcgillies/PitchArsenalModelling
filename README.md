@@ -9,6 +9,8 @@ Data:
 - include other pitch metrics in indivudal pitch models (context) - zone%?   chase%?
     - COMPLETED -> Not completely flattening out all other pitch data, but creating some "context" features. ie. relation to primary fastball, usage, etc. 
 - filter to min pitch threshold
+    - COMPLETED -> initial filter of 30 pitches pre processing, still need to filter after
+    - Stuff+ stabilizes at 60-80 pitches. 
 - rolling avgs over season?
 - Pitch type noise? ie. SL and CT with similar shapes? do we want to deal with that? clustering?
 
