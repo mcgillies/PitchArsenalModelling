@@ -7,6 +7,7 @@ TODO:
 Data:
 - Include other metrics besides whiff and csw
 - include other pitch metrics in indivudal pitch models (context) - zone%?   chase%?
+    - COMPLETED -> Not completely flattening out all other pitch data, but creating some "context" features. ie. relation to primary fastball, usage, etc. 
 - filter to min pitch threshold
 - rolling avgs over season?
 - Pitch type noise? ie. SL and CT with similar shapes? do we want to deal with that? clustering?
