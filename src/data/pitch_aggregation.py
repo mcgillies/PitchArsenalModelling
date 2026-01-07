@@ -3,6 +3,7 @@ from pybaseball import statcast
 import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
+from pathlib import Path
 
 
 def calculate_vaa_haa(df):
@@ -155,6 +156,8 @@ def aggregate_pitch_data(start_date, end_date, save=False, output_path=None):
     if save:
         if output_path is None:
             raise ValueError("output_path must be specified when save=True")
+        output_path = Path(output_path)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
         print(f"Saving to {output_path}...")
         final.to_parquet(output_path)
         print("Done!")
@@ -164,12 +167,17 @@ def aggregate_pitch_data(start_date, end_date, save=False, output_path=None):
 
 if __name__ == "__main__":
     # Example usage
-    start_date = '2024-03-28'
-    end_date = '2025-06-27'
+    start_date = '2025-03-28'
+    end_date = '2025-03-29'
+    
+    # Resolve to project root data folder
+    project_root = Path(__file__).parent.parent.parent
+    output_path = project_root / 'data' / f'{start_date}_{end_date}_pitches_description_whiff_csw_stats.parquet'
+    
     result = aggregate_pitch_data(
         start_date=start_date,
         end_date=end_date,
         save=True,
-        output_path=f'data/{start_date}_{end_date}_pitches_description_whiff_csw_stats.parquet'
+        output_path=str(output_path)
     )
     print(result.head())
