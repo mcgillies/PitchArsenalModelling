@@ -193,8 +193,8 @@ if __name__ == "__main__":
     # Example usage
     from pitch_aggregation import aggregate_pitch_data
     
-    start_date = '2025-03-28'
-    end_date = '2025-03-29'
+    start_date = '2024-03-28'
+    end_date = '2025-06-29'
     
     project_root = Path(__file__).parent.parent.parent
     agg_output_path = project_root / 'data' / f'{start_date}_{end_date}_pitches_description_whiff_csw_stats.parquet'
