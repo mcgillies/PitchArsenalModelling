@@ -80,7 +80,8 @@ def add_arsenal_context_features(
     )
 
     # --- 3) Arsenal summary features (per pitcher-season) ---
-    out["arsenal_size"] = out.groupby(key_cols)["pitch_type"].transform("nunique")
+    # Changed to calculate before filtering
+    # out["arsenal_size"] = out.groupby(key_cols)["pitch_type"].transform("nunique")
 
     def second_highest(s: pd.Series) -> float:
         vals = np.sort(s.to_numpy())
@@ -170,6 +171,9 @@ def process_pitches(df, min_pitches=30, save=False, start_date=None, end_date=No
     
     # Filter on minimum number of pitches
     filtered_pitches = filtered_pitches[filtered_pitches['pitches'] >= min_pitches]
+
+    # Create arsenal size column before filtering
+    filtered_pitches["arsenal_size"] = filtered_pitches.groupby(["pitcher", "season"])["pitch_type"].transform("nunique")
     
     # Add arsenal context features
     print("Adding arsenal context features...")
