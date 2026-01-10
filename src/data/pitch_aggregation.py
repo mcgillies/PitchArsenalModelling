@@ -129,6 +129,7 @@ def aggregate_pitch_data(start_date, end_date, save=False, output_path=None):
         df.groupby(['pitcher', 'pitch_type', 'season'])
         .agg(
             n_pitches=('description', 'count'),
+            p_throws=('p_throws', 'first'),
             velo=('release_speed', 'mean'),
             pfx_x=('pfx_x', 'mean'),
             pfx_z=('pfx_z', 'mean'),
