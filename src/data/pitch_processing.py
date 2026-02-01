@@ -54,6 +54,10 @@ def process_pitches(df, min_pitches=30, save=False, start_date=None, end_date=No
     id_cols = ["pitcher", "pitch_type", "season", "p_throws"]
     feature_cols = [c for c in filtered_pitches.columns if c not in id_cols]
 
+    feature_cols.remove("whiff_pct")
+    feature_cols.remove("pitches")
+    feature_cols.remove("csw_pct")
+
     # Flatten: pivot so each pitch type becomes column prefixes
     print("Flattening pitch data to pitcher-level...")
 
@@ -114,8 +118,8 @@ if __name__ == "__main__":
     # Example usage
     from pitch_aggregation import aggregate_pitch_data
     
-    start_date = '2025-03-30'
-    end_date = '2025-04-30'
+    start_date = '2023-03-30'
+    end_date = '2025-09-30'
     
     project_root = Path(__file__).parent.parent.parent
     agg_output_path = project_root / 'data' / f'{start_date}_{end_date}_pitches_description_whiff_csw_stats.parquet'
