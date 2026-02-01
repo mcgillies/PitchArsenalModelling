@@ -80,7 +80,8 @@ def add_arsenal_context_features(
     )
 
     # --- 3) Arsenal summary features (per pitcher-season) ---
-    out["arsenal_size"] = out.groupby(key_cols)["pitch_type"].transform("nunique")
+    # Changed to calculate before filtering
+    # out["arsenal_size"] = out.groupby(key_cols)["pitch_type"].transform("nunique")
 
     def second_highest(s: pd.Series) -> float:
         vals = np.sort(s.to_numpy())
@@ -161,7 +162,7 @@ def process_pitches(df, min_pitches=30, save=False, start_date=None, end_date=No
     """
     
     # Remove unnecessary columns
-    filtered_pitches = df.drop(columns=['swings', 'whiffs', 'called_strikes', 'balls', 'n_pitches'])
+    filtered_pitches = df.drop(columns=['swings', 'whiffs', 'called_strikes', 'balls', 'n_pitches'], errors='ignore')
     
     # Convert pfx_x and pfx_z to HB and IVB in inches
     filtered_pitches['HB'] = filtered_pitches['pfx_x'] * 12
@@ -170,6 +171,9 @@ def process_pitches(df, min_pitches=30, save=False, start_date=None, end_date=No
     
     # Filter on minimum number of pitches
     filtered_pitches = filtered_pitches[filtered_pitches['pitches'] >= min_pitches]
+
+    # Create arsenal size column before filtering
+    filtered_pitches["arsenal_size"] = filtered_pitches.groupby(["pitcher", "season"])["pitch_type"].transform("nunique")
     
     # Add arsenal context features
     print("Adding arsenal context features...")
@@ -193,8 +197,8 @@ if __name__ == "__main__":
     # Example usage
     from pitch_aggregation import aggregate_pitch_data
     
-    start_date = '2024-03-28'
-    end_date = '2025-06-29'
+    start_date = '2023-03-30'
+    end_date = '2025-09-30'
     
     project_root = Path(__file__).parent.parent.parent
     agg_output_path = project_root / 'data' / f'{start_date}_{end_date}_pitches_description_whiff_csw_stats.parquet'
@@ -206,7 +210,7 @@ if __name__ == "__main__":
         save=True,
         output_path=str(agg_output_path)
     )
-    
+
     # Process with arsenal features
     processed_df = process_pitches(
         agg_df,
