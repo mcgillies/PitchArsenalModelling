@@ -155,7 +155,8 @@ def ensure_plot_cols(df: pd.DataFrame) -> pd.DataFrame:
     df["std_z"] = pd.to_numeric(df.get("std_z", 0.5), errors="coerce").fillna(0.5)
 
     # Ensure visible marker sizes (usage can be tiny)
-    df["plot_size"] = np.clip(df["usage"] * 80, 12, 45)
+    # df["plot_size"] = np.clip(df["usage"] * 80, 12, 45)
+    df['plot_size']=3
     # Location plot size based on average of std_x and std_z
     df["location_size"] = np.clip((df["std_x"] + df["std_z"]) * 30, 10, 50)
     df["idx"] = np.arange(len(df))
@@ -473,7 +474,6 @@ with right:
             y="IVB",
             text="pitch_type",
             color="pitch_type",
-            size="plot_size",
             hover_data=["usage", "velo", "VAA", "spin", "ext"],
             title="Pitch Movement"
         )
