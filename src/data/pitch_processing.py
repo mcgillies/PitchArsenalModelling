@@ -176,8 +176,9 @@ def process_pitches(df, min_pitches=30, save=False, start_date=None, end_date=No
     filtered_pitches["arsenal_size"] = filtered_pitches.groupby(["pitcher", "season"])["pitch_type"].transform("nunique")
     
     # Add arsenal context features
-    print("Adding arsenal context features...")
-    arsenal_df = add_arsenal_context_features(filtered_pitches)
+    # print("Adding arsenal context features...")
+    # arsenal_df = add_arsenal_context_features(filtered_pitches)
+    arsenal_df=filtered_pitches
     
     # Save if requested
     if save:
@@ -197,7 +198,7 @@ if __name__ == "__main__":
     # Example usage
     from pitch_aggregation import aggregate_pitch_data
     
-    start_date = '2023-03-30'
+    start_date = '2025-03-30'
     end_date = '2025-09-30'
     
     project_root = Path(__file__).parent.parent.parent
