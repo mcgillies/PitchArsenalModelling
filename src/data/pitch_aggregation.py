@@ -272,54 +272,16 @@ def aggregate_pitch_data(start_date, end_date, group_by_pitch_type=True, save=Fa
         # Handedness mix
         "pct_vs_RHB": ("is_vs_RHB", "mean"),
 
-        # Coarse location intent features
-        "above_zone_rate": ("above_zone", "mean"),
-        "below_zone_rate": ("below_zone", "mean"),
-        "zbin_low_rate": ("zbin_low", "mean"),
-        "zbin_mid_rate": ("zbin_mid", "mean"),
-        "zbin_high_rate": ("zbin_high", "mean"),
-        "glove_side_rate": ("x_glove_side", "mean"),
-        "arm_side_rate": ("x_arm_side", "mean"),
-        "edge_rate": ("edge", "mean"),
-        "mean_z_dist_mid": ("z_dist_mid", "mean"),
-        "mean_x_dist_center": ("x_dist_center", "mean"),
-
-        # Command features - location tendency
-        "x_mean": ("plate_x", "mean"),
-        "z_mean": ("plate_z", "mean"),
-
-        # Command features - consistency (core command signal)
-        "x_std": ("plate_x", "std"),
-        "z_std": ("plate_z", "std"),
-
-        # Command features - spread
-        "x_range": ("plate_x", lambda s: s.max() - s.min()),
-        "z_range": ("plate_z", lambda s: s.max() - s.min()),
-
-        # Command features - zone control
+        # Location features (limited set)
+        "mean_x": ("plate_x", "mean"),
+        "mean_z": ("plate_z", "mean"),
+        "std_x": ("plate_x", "std"),
+        "std_z": ("plate_z", "std"),
         "pct_in_zone": ("in_zone", "mean"),
-        "pct_on_edge": ("on_edge", "mean"),
-
-        # Command features - distance from center
-        "dist_mean": ("dist_from_center", "mean"),
-        "dist_std": ("dist_from_center", "std"),
-
-        # Command features - tendencies
-        "pct_high": ("is_high", "mean"),
-        "pct_outside": ("is_outside", "mean"),
     }
-
-    # Add sequential feature if available
-    if has_seq:
-        agg_dict["seq_dist_mean"] = ("seq_dist", "mean")
 
     # Perform aggregation
     result = df.groupby(group_cols, dropna=False).agg(**agg_dict).reset_index()
-
-    # --- 7) Compute correlation features (requires manual loop) ---
-    print("Computing correlation features...")
-    corr_features = _compute_correlation_features(df, group_cols)
-    result = result.merge(corr_features, on=group_cols, how="left")
 
     # --- 8) Compute derived metrics ---
     # Safe divisions for rates
