@@ -80,7 +80,7 @@ def process_pitches(df, min_pitches=30, save=False, start_date=None, end_date=No
                     pivoted[col_name] = np.nan
 
     # Get pitch_type per pitcher-season (one row per pitch type they throw)
-    pitch_types_df = filtered_pitches[["pitcher", "season", "pitch_type"]].copy()
+    pitch_types_df = filtered_pitches[["pitcher", "season", "pitch_type", "pitches", 'whiff_pct']].copy()
 
     # Merge pivoted columns to pitch_type level (one row per pitcher-season-pitch_type)
     result = pitch_types_df.merge(pivoted, on=["pitcher", "season"], how="left")
@@ -90,7 +90,7 @@ def process_pitches(df, min_pitches=30, save=False, start_date=None, end_date=No
     result = result.merge(p_throws, on=["pitcher", "season"], how="left")
 
     # Reorder columns: identifiers first, then pivoted features alphabetically
-    id_output_cols = ["pitcher", "season", "p_throws", "pitch_type", "arsenal_size"]
+    id_output_cols = ["pitcher", "season", "p_throws", "pitch_type", "arsenal_size", "pitches", "whiff_pct"]
     feature_output_cols = sorted([c for c in result.columns if c not in id_output_cols])
     result = result[id_output_cols + feature_output_cols]
 
@@ -114,8 +114,8 @@ if __name__ == "__main__":
     # Example usage
     from pitch_aggregation import aggregate_pitch_data
     
-    start_date = '2023-03-30'
-    end_date = '2025-09-30'
+    start_date = '2025-03-30'
+    end_date = '2025-04-30'
     
     project_root = Path(__file__).parent.parent.parent
     agg_output_path = project_root / 'data' / f'{start_date}_{end_date}_pitches_description_whiff_csw_stats.parquet'
