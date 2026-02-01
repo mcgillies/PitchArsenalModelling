@@ -166,7 +166,10 @@ def _compute_correlation_features(df, group_cols):
 
         row["x_signed_offset"] = (group["plate_x"] - ZONE_CENTER_X).mean()
         row["z_signed_offset"] = (group["plate_z"] - ZONE_CENTER_Z).mean()
-        row["xz_correlation"] = group["plate_x"].corr(group["plate_z"]) if len(group) > 2 else np.nan
+        try:
+            row["xz_correlation"] = group["plate_x"].corr(group["plate_z"]) if len(group) > 2 else np.nan
+        except (AttributeError, ValueError):
+            row["xz_correlation"] = np.nan
         offset_corr.append(row)
 
     return pd.DataFrame(offset_corr)
