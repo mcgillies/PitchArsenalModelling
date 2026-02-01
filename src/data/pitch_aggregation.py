@@ -165,6 +165,120 @@ def fetch_statcast_chunked(start_date, end_date, chunk_days=7):
     
 #     return final
 
+import pandas as pd
+import numpy as np
+
+# ---------------------------------------------------------------------------
+# ZONE CONSTANTS (MLB regulation)
+# Adjust these if your pitch_x/pitch_z use a different origin or units.
+# ---------------------------------------------------------------------------
+ZONE_LEFT   = -0.7083   # ~8.5 inches left of center, in feet
+ZONE_RIGHT  =  0.7083
+ZONE_BOTTOM =  1.5      # approximate low edge
+ZONE_TOP    =  3.4      # approximate high edge
+ZONE_CENTER_X = 0.0
+ZONE_CENTER_Z = (ZONE_BOTTOM + ZONE_TOP) / 2  # ~2.45 ft
+
+
+def compute_command_features(df, group_cols=["player_id", "season"], game_col="game_id"):
+    """
+    Computes 15 command features from pitch_x and pitch_z.
+
+    Features
+    --------
+    x_mean, z_mean              - baseline location tendency
+    x_std, z_std                - consistency on each axis (core command signal)
+    pct_in_zone                 - most direct measure of command
+    pct_on_edge                 - edge vs. middle of zone usage
+    dist_mean, dist_std         - avg distance from zone center & its consistency
+    x_range, z_range            - how much of the zone they work
+    seq_dist_mean               - pitch-to-pitch movement (unpredictability)
+    x_signed_offset             - directional bias left/right of center
+    z_signed_offset             - directional bias above/below center
+    xz_correlation              - whether misses tend diagonal vs. axis-aligned
+    pct_high                    - vertical tendency (only need one of high/low)
+    pct_outside                 - horizontal tendency (only need one of in/out)
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Pitch-level data. Must have: pitch_x, pitch_z, + group_cols.
+        Must have game_col if you want seq_dist_mean (set game_col=None to skip).
+    group_cols : list
+        Columns to group by (e.g., ["player_id", "season"]).
+    game_col : str or None
+        Column identifying each game. Set to None to skip sequential feature.
+    """
+    df = df.copy()
+
+    # --- precompute per-pitch columns ---
+    df["dist_from_center"] = np.sqrt(
+        (df["pitch_x"] - ZONE_CENTER_X) ** 2 +
+        (df["pitch_z"] - ZONE_CENTER_Z) ** 2
+    )
+    df["in_zone"] = (
+        (df["pitch_x"] >= ZONE_LEFT)  & (df["pitch_x"] <= ZONE_RIGHT) &
+        (df["pitch_z"] >= ZONE_BOTTOM) & (df["pitch_z"] <= ZONE_TOP)
+    )
+
+    # Edge = in zone but NOT in the inner third on both axes
+    x_third = (ZONE_RIGHT - ZONE_LEFT) / 3
+    z_third = (ZONE_TOP - ZONE_BOTTOM) / 3
+    df["on_edge"] = df["in_zone"] & ~(
+        (df["pitch_x"] >= ZONE_LEFT  + x_third) & (df["pitch_x"] <= ZONE_RIGHT - x_third) &
+        (df["pitch_z"] >= ZONE_BOTTOM + z_third) & (df["pitch_z"] <= ZONE_TOP   - z_third)
+    )
+
+    df["is_high"]    = df["pitch_z"] > ZONE_CENTER_Z
+    df["is_outside"] = df["pitch_x"].abs() >= (ZONE_RIGHT / 2)
+
+    # --- sequential: pitch-to-pitch distance ---
+    has_seq = game_col and game_col in df.columns
+    if has_seq:
+        df = df.sort_values(group_cols + [game_col])
+        prev_cols = group_cols + [game_col]
+        df["prev_x"] = df.groupby(prev_cols)["pitch_x"].shift(1)
+        df["prev_z"] = df.groupby(prev_cols)["pitch_z"].shift(1)
+        df["seq_dist"] = np.sqrt(
+            (df["pitch_x"] - df["prev_x"]) ** 2 +
+            (df["pitch_z"] - df["prev_z"]) ** 2
+        )
+
+    # --- aggregate ---
+    aggs = {
+        "x_mean":           ("pitch_x",         "mean"),
+        "z_mean":           ("pitch_z",         "mean"),
+        "x_std":            ("pitch_x",         "std"),
+        "z_std":            ("pitch_z",         "std"),
+        "x_range":          ("pitch_x",         lambda s: s.max() - s.min()),
+        "z_range":          ("pitch_z",         lambda s: s.max() - s.min()),
+        "pct_in_zone":      ("in_zone",         "mean"),
+        "pct_on_edge":      ("on_edge",         "mean"),
+        "dist_mean":        ("dist_from_center","mean"),
+        "dist_std":         ("dist_from_center","std"),
+        "pct_high":         ("is_high",         "mean"),
+        "pct_outside":      ("is_outside",      "mean"),
+    }
+
+    if has_seq:
+        aggs["seq_dist_mean"] = ("seq_dist", "mean")
+
+    features = df.groupby(group_cols).agg(**aggs).reset_index()
+
+    # --- signed offset & correlation need a manual loop (can't do in .agg) ---
+    offset_corr = []
+    for name, group in df.groupby(group_cols):
+        row = dict(zip(group_cols, name)) if isinstance(name, tuple) else {group_cols[0]: name}
+        row["x_signed_offset"] = (group["pitch_x"] - ZONE_CENTER_X).mean()
+        row["z_signed_offset"] = (group["pitch_z"] - ZONE_CENTER_Z).mean()
+        row["xz_correlation"]  = group["pitch_x"].corr(group["pitch_z"]) if len(group) > 2 else np.nan
+        offset_corr.append(row)
+
+    features = features.merge(pd.DataFrame(offset_corr), on=group_cols, how="left")
+
+    print(f"Done. {features.shape[1]} features, {features.shape[0]} rows.")
+    return features
+
 
 def aggregate_pitch_data(start_date, end_date, save=False, output_path=None):
     """
@@ -228,31 +342,31 @@ def aggregate_pitch_data(start_date, end_date, save=False, output_path=None):
     df["is_vs_RHB"] = (df["stand"] == "R").astype(int)
 
     # Simple zone thresholds (ft). These are intentionally coarse and stable.
-    Z_LOW = 1.8
-    Z_HIGH = 3.5
-    Z_MID = 2.65
-    X_EDGE = 0.7
+    # Z_LOW = 1.8
+    # Z_HIGH = 3.5
+    # Z_MID = 2.65
+    # X_EDGE = 0.7
 
-    df["above_zone"] = df["plate_z"] > Z_HIGH
-    df["below_zone"] = df["plate_z"] < Z_LOW
+    # df["above_zone"] = df["plate_z"] > Z_HIGH
+    # df["below_zone"] = df["plate_z"] < Z_LOW
 
-    # z bins: low / mid / high
-    df["zbin_low"] = df["plate_z"] < Z_LOW
-    df["zbin_high"] = df["plate_z"] > Z_HIGH
-    df["zbin_mid"] = (~df["zbin_low"]) & (~df["zbin_high"]) & df["plate_z"].notna()
+    # # z bins: low / mid / high
+    # df["zbin_low"] = df["plate_z"] < Z_LOW
+    # df["zbin_high"] = df["plate_z"] > Z_HIGH
+    # df["zbin_mid"] = (~df["zbin_low"]) & (~df["zbin_high"]) & df["plate_z"].notna()
 
-    # handedness-adjusted horizontal location so "glove-side" is consistent:
-    # for LHB, flip sign so + means glove-side (relative to pitcher)
-    df["plate_x_adj"] = np.where(df["stand"] == "L", -df["plate_x"], df["plate_x"])
-    df["x_glove_side"] = df["plate_x_adj"] > X_EDGE
-    df["x_arm_side"] = df["plate_x_adj"] < -X_EDGE
+    # # handedness-adjusted horizontal location so "glove-side" is consistent:
+    # # for LHB, flip sign so + means glove-side (relative to pitcher)
+    # df["plate_x_adj"] = np.where(df["stand"] == "L", -df["plate_x"], df["plate_x"])
+    # df["x_glove_side"] = df["plate_x_adj"] > X_EDGE
+    # df["x_arm_side"] = df["plate_x_adj"] < -X_EDGE
 
-    # Distance-based (stable)
-    df["z_dist_mid"] = (df["plate_z"] - Z_MID).abs()
-    df["x_dist_center"] = df["plate_x"].abs()
+    # # Distance-based (stable)
+    # df["z_dist_mid"] = (df["plate_z"] - Z_MID).abs()
+    # df["x_dist_center"] = df["plate_x"].abs()
 
-    # Simple "edge" definition: near sides while in the vertical middle band
-    df["edge"] = (df["plate_x"].abs() > X_EDGE) & df["plate_z"].between(Z_LOW, Z_HIGH)
+    # # Simple "edge" definition: near sides while in the vertical middle band
+    # df["edge"] = (df["plate_x"].abs() > X_EDGE) & df["plate_z"].between(Z_LOW, Z_HIGH)
 
     # --- 5) Aggregate targets per pitcher-pitch_type-season ---
     print("Aggregating pitch statistics...")
