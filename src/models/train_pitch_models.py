@@ -4,7 +4,11 @@ from pathlib import Path
 from xgboost import XGBRegressor
 from sklearn.model_selection import GroupShuffleSplit
 from sklearn.metrics import mean_squared_error, r2_score
+from sklearn.ensemble import RandomForestRegressor
 import json
+import optuna
+from lightgbm import LGBMRegressor
+from catboost import CatBoostRegressor
 
 
 def get_next_version(models_dir):
@@ -59,6 +63,109 @@ def preprocess_pitch_data(df, pitch_type, cat_cols):
     X_train, X_val = X_train.align(X_val, join="left", axis=1, fill_value=0)
     
     return X_train, X_val, y_train, y_val, train, val
+
+def objective(trial, X_train, y_train, X_valid, y_valid):
+    model_type = trial.suggest_categorical(
+        "model_type", ["xgboost", "lightgbm", "random_forest"]
+    )
+
+    if model_type == "xgboost":
+        params = {
+            "n_estimators": trial.suggest_int("xgb_n_estimators", 200, 2000),
+            "max_depth": trial.suggest_int("xgb_max_depth", 3, 12),
+            "learning_rate": trial.suggest_float("xgb_learning_rate", 0.01, 0.3, log=True),
+            "subsample": trial.suggest_float("xgb_subsample", 0.5, 1.0),
+            "colsample_bytree": trial.suggest_float("xgb_colsample_bytree", 0.5, 1.0),
+            "min_child_weight": trial.suggest_float("xgb_min_child_weight", 1e-3, 50.0, log=True),
+            "gamma": trial.suggest_float("xgb_gamma", 0.0, 10.0),
+            "reg_alpha": trial.suggest_float("xgb_reg_alpha", 1e-8, 10.0, log=True),
+            "reg_lambda": trial.suggest_float("xgb_reg_lambda", 1e-8, 10.0, log=True),
+            "random_state": 42,
+            "n_jobs": -1,
+        }
+        model = XGBRegressor(**params)
+
+    elif model_type == "lightgbm":
+        params = {
+            "n_estimators": trial.suggest_int("lgb_n_estimators", 200, 5000),
+            "learning_rate": trial.suggest_float("lgb_learning_rate", 0.005, 0.3, log=True),
+            "num_leaves": trial.suggest_int("lgb_num_leaves", 16, 512),
+            "max_depth": trial.suggest_int("lgb_max_depth", -1, 16),
+            "min_child_samples": trial.suggest_int("lgb_min_child_samples", 5, 200),
+            "subsample": trial.suggest_float("lgb_subsample", 0.5, 1.0),
+            "colsample_bytree": trial.suggest_float("lgb_colsample_bytree", 0.5, 1.0),
+            "reg_alpha": trial.suggest_float("lgb_reg_alpha", 1e-8, 10.0, log=True),
+            "reg_lambda": trial.suggest_float("lgb_reg_lambda", 1e-8, 10.0, log=True),
+            "random_state": 42,
+            "n_jobs": -1,
+            "verbose": -1,
+        }
+        model = LGBMRegressor(**params)
+
+    else:  # random_forest
+        params = {
+            "n_estimators": trial.suggest_int("rf_n_estimators", 200, 2000),
+            "max_depth": trial.suggest_int("rf_max_depth", 2, 50),
+            "min_samples_split": trial.suggest_int("rf_min_samples_split", 2, 20),
+            "min_samples_leaf": trial.suggest_int("rf_min_samples_leaf", 1, 20),
+            "max_features": trial.suggest_categorical("rf_max_features", ["sqrt", "log2", 0.5, 1.0]),
+            "bootstrap": trial.suggest_categorical("rf_bootstrap", [True, False]),
+            "random_state": 42,
+            "n_jobs": -1,
+        }
+        model = RandomForestRegressor(**params)
+
+    # Fit
+    if model_type == "catboost":
+        model.fit(X_train, y_train, eval_set=(X_valid, y_valid), use_best_model=False)
+    else:
+        model.fit(X_train, y_train)
+
+    # Evaluate
+    y_pred = model.predict(X_valid)
+    rmse = float(np.sqrt(mean_squared_error(y_valid, y_pred)))
+    return rmse
+
+
+def train_pitch_model_optimized(X_train, y_train, X_val, y_val, random_state=42):
+    """Trains a model to predict the target using optuna hyperparam optimization
+
+    Args:
+        X_train (pd.DataFrame): Training features
+        y_train (pd.Series): Training target values
+        X_val (pd.DataFrame): Validation features
+        y_val (pd.Series): Validation target values
+        random_state (int, optional): Random state for reproducibility. Defaults to 42.
+    Returns:
+        model: Trained model with best hyperparameters
+    """
+    study = optuna.create_study(direction="minimize") 
+    study.optimize(lambda trial: objective(trial, X_train, y_train, X_val, y_val), n_trials=50)
+
+    print("Best trial:")
+    trial = study.best_trial
+    print("  RMSE: {}".format(trial.value))
+    print("  Params: ")
+    for key, value in trial.params.items():
+        print("    {}: {}".format(key, value))
+
+
+    best_params = trial.params
+
+    if best_params['model_type']=='xgboost':
+        best_params = {k.replace('xgb_',''):v for k,v in best_params.items() if k.startswith('xgb_')}
+        model = XGBRegressor(**best_params, random_state=42)
+    elif best_params['model_type']=='lightgbm':
+        best_params = {k.replace('lgb_',''):v for k,v in best_params.items() if k.startswith('lgb_')}
+        model = LGBMRegressor(**best_params, random_state=42)
+    elif best_params['model_type']=='random_forest':
+        best_params = {k.replace('rf_',''):v for k,v in best_params.items() if k.startswith('rf_')}
+        model = RandomForestRegressor(**best_params, random_state=42)
+
+    model.fit(X_train, y_train)
+
+    return model
+
 
 
 def train_pitch_model(X_train, y_train, w_train, random_state=42):
@@ -127,20 +234,17 @@ def train_all_pitch_models(
     """
     
     if cat_cols is None:
-        cat_cols = ['p_throws', 'fb_pitch_type']
+        cat_cols = ['p_throws']
     
     # Load data
     print(f"Loading data from {data_path}...")
     df = pd.read_parquet(data_path)
     
-    # Drop NAs
-    df = df.dropna()
-    
-    # Get pitch types to train
     if pitch_types is None:
         # Get all pitch types with sufficient data
         pitch_type_counts = df.groupby("pitch_type").size()
         pitch_types = pitch_type_counts[pitch_type_counts >= min_pitches].index.tolist()
+
     
     print(f"Training models for pitch types: {pitch_types}")
     
