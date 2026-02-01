@@ -197,8 +197,8 @@ if __name__ == "__main__":
     # Example usage
     from pitch_aggregation import aggregate_pitch_data
     
-    start_date = '2024-03-28'
-    end_date = '2025-06-29'
+    start_date = '2023-03-30'
+    end_date = '2025-09-30'
     
     project_root = Path(__file__).parent.parent.parent
     agg_output_path = project_root / 'data' / f'{start_date}_{end_date}_pitches_description_whiff_csw_stats.parquet'
@@ -210,7 +210,7 @@ if __name__ == "__main__":
         save=True,
         output_path=str(agg_output_path)
     )
-    
+
     # Process with arsenal features
     processed_df = process_pitches(
         agg_df,
