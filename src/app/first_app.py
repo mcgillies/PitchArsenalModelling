@@ -273,24 +273,17 @@ with right:
             x="HB",
             y="IVB",
             text="pitch_type",
+            color="pitch_type",
             size="plot_size",
             hover_data=["usage", "velo", "VAA", "spin", "ext"],
-            symbol="selected",
-            title="Click a point to select it (then adjust HB/IVB below)"
+            title="Pitch Movement"
         )
-        fig.update_traces(textposition="top center")
-        fig.update_layout(height=520)
-        fig.update_xaxes(zeroline=True)
-        fig.update_yaxes(zeroline=True)
+        fig.update_traces(textposition="top center", marker=dict(sizemode="diameter"))
+        fig.update_layout(height=520, showlegend=True)
+        fig.update_xaxes(zeroline=True, title="Horizontal Break (in)", range=[-25, 25])
+        fig.update_yaxes(zeroline=True, title="Induced Vertical Break (in)", range=[-25, 25])
 
-        if HAS_PLOTLY_EVENTS:
-            selected = plotly_events(fig, click_event=True, hover_event=False, select_event=False)
-            if selected:
-                st.session_state.selected_idx = int(selected[0]["pointIndex"])
-                sel = st.session_state.selected_idx
-        else:
-            st.plotly_chart(fig, use_container_width=True)
-            st.info("Install click-to-select support: pip install streamlit-plotly-events")
+        st.plotly_chart(fig, use_container_width=True)
 
         sel = int(np.clip(st.session_state.selected_idx, 0, len(df_plot) - 1))
         st.markdown(f"**Selected pitch:** `{df_plot.loc[sel, 'pitch_type']}` (row {sel})")
