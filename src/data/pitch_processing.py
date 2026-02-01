@@ -162,7 +162,7 @@ def process_pitches(df, min_pitches=30, save=False, start_date=None, end_date=No
     """
     
     # Remove unnecessary columns
-    filtered_pitches = df.drop(columns=['swings', 'whiffs', 'called_strikes', 'balls', 'n_pitches'])
+    filtered_pitches = df.drop(columns=['swings', 'whiffs', 'called_strikes', 'balls', 'n_pitches'], errors='ignore')
     
     # Convert pfx_x and pfx_z to HB and IVB in inches
     filtered_pitches['HB'] = filtered_pitches['pfx_x'] * 12
