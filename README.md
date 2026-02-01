@@ -27,23 +27,26 @@ App:
 
 
 
-## TODO as of Jan 31
+## TODO as of Feb 1
 
 Data:
-- Tried incorporating fully flattened pitches - minimal difference in model results
-    - "Best" model on val loss overfits (basically 0 train loss)
-- Figure out how to leverage command in the model using plate location
+- Seem to have settled on "optimal" feature space
+    - include location somewhat, but also simple enough user can specify/change
+- pct vs RHB feature?
 
 Models:
-- Tried all tree-based models w/ hyperparam opt. not much difference
-- basic neural nets? doubtful but maybe
+- Seems to be optimizied
+- Include more model details in script? feat importances, shap, etc?
+- shap plots show gray dots when feature is null?
 
 App:
 - remove unknown pitchers
-- fix bubble size in pitch plot
 - FUTURE: add possible deviation param for IVB/HB
-- include all relevant features in data table - depends on what gets passed to model
 - connect database back to model pipeline - preprocess, predict, show prediction in app. 
+- aesthetics
+- in ivb/hb plot do scatter of entire season rather than aggregated
+- Specify handedness, flip axis on HB plot
+
 
 
 
